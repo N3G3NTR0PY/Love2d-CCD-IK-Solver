@@ -180,7 +180,8 @@ end
 ----- CCD STEP
 local function ccdCorrectionStep(number, currentAngle, targetAngle, baseConvergenceRate)
     local delta = targetAngle - currentAngle
-    local convergenceRate = math.min(baseConvergenceRate / arm.linkLengths[number], baseConvergenceRate / 30) -- 30 IS MINIMUM STABLE AMOUNT
+	local minimumConverganceRate = baseConvergenceRate / 30
+    local convergenceRate = math.min(baseConvergenceRate / arm.linkLengths[number], minimumConverganceRate)
     while delta > math.pi do
         delta = delta - math.pi * 2
     end 
