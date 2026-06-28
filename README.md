@@ -13,4 +13,4 @@
 - `Space` -> Toggle auto (IK) mode (The arm follows mouse :D)
 - Mouse movement -> Set target position
 
-![Demo of simulation](assets/demo.gif)
+![Demo of the simulation](assets/demo.gif)
