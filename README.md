@@ -13,4 +13,7 @@
 - `Space` -> Toggle auto (IK) mode (The arm follows mouse :D)
 - Mouse movement -> Set target position
 
+
+***DEMO OF THE SIMULATION***
+
 ![Demo of the simulation](https://raw.githubusercontent.com/N3G3NTR0PY/Love2d-CCD-IK-Solver/refs/heads/main/assets/demo.gif)
