@@ -1,6 +1,4 @@
-**!!! NO AI CODE USED HERE !!!**
-
- So, for my 2nd project, this implements a dynamic N-DOF planar serial manipulator simulation using the Cyclic Coordinate Descent (CCD) algorithm for real-time inverse kinematics. The solver iteratively minimizes the error between the end-effector and a target point in task space, employing adaptive convergence scaling to account for varying link leverage. The workspace is constrained to the manipulator's reachable radius, and singularity protection prevents numerical instability at degenerate configurations.
+So, for my 2nd project, this is a 2D Love2D simulation of manipulator with a manual control and a mode with inverse kinematics that is implemented using the cyclic coordinate descent (or CCD) algorithm. The config dynamicly adapts for any amount of segments specified, their lenghts (oh and also it scales the step size by the lenghts) and starting angles. It even has relative angle clamps!1!1! And uhm theres various protections for when the angle exceeds 2pi or when the angles become zero ah yeah also theres a visual marking for when the target is unreachable and a cool graphic vizualization of the arm (it even has a shadow). Im not very good at writing this stuff but i hope this explains it.
 
  If we remove the scary technical jargon, this is a robotic arm simulation coded in Love2d.
 
