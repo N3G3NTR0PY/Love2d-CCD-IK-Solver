@@ -3,11 +3,10 @@ local color = {
     black = {0, 0, 0, 1},
     white = {1, 1, 1, 1},
     gray  = {0.5, 0.5, 0.5, 1},
-    lightPurle = {0.2117, 0.2117, 0.2980, 1},
+    lightPurple = {0.2117, 0.2117, 0.2980, 1},
     darkPurple = {0.1021, 0.1021, 0.1505, 1},
     armShadow = {0.1450, 0.1450, 0.2078, 1},
     foregroundShadow = {0, 0, 0, 0.3}
-    
 }
 
 ----- WINDOW DEFAULTS
@@ -22,7 +21,7 @@ local centerX, centerY = window.width / 2, window.height / 2
 
 ----- SCENE CONFIG
 local scene = {
-    backgroundColor = color.lightPurle,
+    backgroundColor = color.lightPurple,
     foregroundColor = color.darkPurple,
     separatorColor = color.white,
     separatorThickness = 20,
@@ -30,7 +29,7 @@ local scene = {
 
     separatorShadowYoffset = 9,
     armShadowXoffset = 11,
-    armShadowYoffset = 9,
+    armShadowYoffset = 8,
 }
 
 ----- CONFIG TABLE (Example configuration)
@@ -110,16 +109,16 @@ end
 
 
 ------ CALCULATE RADIUS AND THICKNESS DECREASE
-arm.radii = {}
 local function updateRadii()
+    arm.radii = {}
     table.insert(arm.radii, arm.jointRadius)
     for link = 2, #arm.linkLengths do
         table.insert(arm.radii, arm.radii[link - 1] / arm.jointRadiusDecreaseRate)
     end
 end
 
-arm.linkThicknesses = {}
 local function updateLinkThicknesses()
+    arm.linkThicknesses = {}
     table.insert(arm.linkThicknesses, arm.lineThickness)
     for link = 2, #arm.linkLengths do
         table.insert(arm.linkThicknesses, arm.linkThicknesses[link - 1] / arm.lineThicknessDecreaseRate)
@@ -180,8 +179,8 @@ end
 ----- CCD STEP
 local function ccdCorrectionStep(number, currentAngle, targetAngle, baseConvergenceRate)
     local delta = targetAngle - currentAngle
-	local minimumConverganceRate = baseConvergenceRate / 30
-    local convergenceRate = math.min(baseConvergenceRate / arm.linkLengths[number], minimumConverganceRate)
+	local maxConvergenceRate = baseConvergenceRate / 30
+    local convergenceRate = math.min(baseConvergenceRate / arm.linkLengths[number], maxConvergenceRate)
     while delta > math.pi do
         delta = delta - math.pi * 2
     end 
@@ -213,8 +212,8 @@ local function clampAngles()
 end
 
 
------ CCD INVERSE KINEMATICS SOLVER (Also known as pain and suffering, but alteast no jacobian here)
-local iterationAmount = 10
+----- CCD INVERSE KINEMATICS SOLVER (Also known as pain and suffering, but at least no jacobian here)
+local iterationAmount = 12
 local autoMode = false
 local function inverseKinematics()
     local dx, dy, targetAngle, currentAbsoluteAngle
@@ -304,13 +303,13 @@ local function modifyLength(number, action, speed, deltaTime)
 end
 
 ----- DRAWN A JOINT
-local function drawJoint(x, y, radius, color, type, fillColor)
-    if type == 'filled' then
-        love.graphics.setColor(fillColor)
-        love.graphics.circle('fill', x, y, radius)
-    end
+local function drawJoint(x, y, radius, color, type)
     love.graphics.setColor(color)
-    love.graphics.circle('line', x, y, radius)
+    if type == 'filled' then
+        love.graphics.circle('fill', x, y, radius)
+    else
+        love.graphics.circle('line', x, y, radius)
+    end
 end
 
 ----- GET MOUSE POS
@@ -341,79 +340,122 @@ function love.draw()
     -- SHADOW OF THE ARM
     love.graphics.setColor(color.armShadow)
     love.graphics.setLineWidth(arm.lineThickness)
-    love.graphics.line(arm.root[1] + scene.armShadowXoffset, arm.root[2] + scene.armShadowYoffset, arm.jointPos[1][1] + scene.armShadowXoffset, arm.jointPos[1][2]+ scene.armShadowYoffset)
+    local dx = arm.jointPos[1][1] - arm.root[1]
+    local dy = arm.jointPos[1][2] - arm.root[2]
+    local currentAngle = math.pi / 2 - math.atan2(dx, dy)
+    local startOffsetX = (arm.radii[1] - arm.jointLineThickness) * math.cos(currentAngle)
+    local startOffsetY = (arm.radii[1] - arm.jointLineThickness) * math.sin(currentAngle)
+    local endOffsetX = (arm.radii[2] - arm.jointLineThickness / 2) * math.cos(currentAngle)
+    local endOffsetY = (arm.radii[2] - arm.jointLineThickness / 2) * math.sin(currentAngle)
+    love.graphics.line(
+        arm.root[1] + scene.armShadowXoffset + startOffsetX, arm.root[2] + scene.armShadowYoffset + startOffsetY,
+        arm.jointPos[1][1] + scene.armShadowXoffset - endOffsetX, arm.jointPos[1][2]+ scene.armShadowYoffset - endOffsetY
+    )
     if selectedSegment ~= 1 then
         love.graphics.setLineWidth(arm.lineThickness / 3)
         love.graphics.setColor(scene.backgroundColor)
-        love.graphics.line(arm.root[1] + scene.armShadowXoffset, arm.root[2] + scene.armShadowYoffset, arm.jointPos[1][1] + scene.armShadowXoffset, arm.jointPos[1][2]+ scene.armShadowYoffset)
+        love.graphics.line(
+            arm.root[1] + scene.armShadowXoffset + startOffsetX, arm.root[2] + scene.armShadowYoffset + startOffsetY,
+            arm.jointPos[1][1] + scene.armShadowXoffset - endOffsetX, arm.jointPos[1][2]+ scene.armShadowYoffset - endOffsetY
+        )
         love.graphics.setLineWidth(arm.lineThickness)
     end
     for segment = 2, #arm.jointPos do
+        dx = arm.jointPos[segment][1] - arm.jointPos[segment - 1][1]
+        dy = arm.jointPos[segment][2] - arm.jointPos[segment - 1][2]
+        currentAngle = math.pi / 2 - math.atan2(dx, dy)
+        startOffsetX = (arm.radii[segment - 1] - arm.jointLineThickness) * math.cos(currentAngle)
+        startOffsetY = (arm.radii[segment - 1] - arm.jointLineThickness) * math.sin(currentAngle)
+        endOffsetX = (arm.radii[segment] - arm.jointLineThickness) * math.cos(currentAngle)
+        endOffsetY = (arm.radii[segment] - arm.jointLineThickness) * math.sin(currentAngle)
         love.graphics.setLineWidth(arm.linkThicknesses[segment])
         love.graphics.setColor(color.armShadow)
         love.graphics.line(
-            arm.jointPos[segment - 1][1] + scene.armShadowXoffset, arm.jointPos[segment - 1][2] + scene.armShadowYoffset,
-            arm.jointPos[segment][1] + scene.armShadowXoffset, arm.jointPos[segment][2] + scene.armShadowYoffset
+            arm.jointPos[segment - 1][1] + scene.armShadowXoffset + startOffsetX, arm.jointPos[segment - 1][2] + scene.armShadowYoffset + startOffsetY,
+            arm.jointPos[segment][1] + scene.armShadowXoffset - endOffsetX, arm.jointPos[segment][2] + scene.armShadowYoffset - endOffsetY
         )
         if selectedSegment ~= segment then
             love.graphics.setLineWidth(arm.linkThicknesses[segment] / 3)
             love.graphics.setColor(scene.backgroundColor)
             love.graphics.line(
-                arm.jointPos[segment - 1][1], arm.jointPos[segment - 1][2],
-                arm.jointPos[segment][1], arm.jointPos[segment][2]
+                arm.jointPos[segment - 1][1] + scene.armShadowXoffset + startOffsetX, arm.jointPos[segment - 1][2] + scene.armShadowYoffset + startOffsetY,
+                arm.jointPos[segment][1]  + scene.armShadowXoffset - endOffsetX, arm.jointPos[segment][2] + scene.armShadowYoffset - endOffsetY
             )
             love.graphics.setLineWidth(arm.lineThickness)
         end
         love.graphics.setLineWidth(arm.jointLineThickness)
-        drawJoint(arm.jointPos[segment - 1][1] + scene.armShadowXoffset, arm.jointPos[segment - 1][2] + scene.armShadowYoffset, arm.radii[segment], color.armShadow, 'filled', scene.backgroundColor)
+        drawJoint(arm.jointPos[segment - 1][1] + scene.armShadowXoffset, arm.jointPos[segment - 1][2] + scene.armShadowYoffset, arm.radii[segment], color.armShadow, 'hollow')
     end
     love.graphics.setLineWidth(arm.jointLineThickness)
-    drawJoint(endEffector[1] + scene.armShadowXoffset, endEffector[2] + scene.armShadowYoffset, arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, color.armShadow, 'filled', scene.backgroundColor)
-    drawJoint(arm.root[1] + scene.armShadowXoffset, arm.root[2] + scene.armShadowYoffset, arm.radii[1], color.armShadow, 'filled', color.armShadow)
+    drawJoint(endEffector[1] + scene.armShadowXoffset, endEffector[2] + scene.armShadowYoffset, arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, color.armShadow, 'hollow')
+    drawJoint(arm.root[1] + scene.armShadowXoffset, arm.root[2] + scene.armShadowYoffset, arm.radii[1], color.armShadow, 'filled')
     -- THE ARM ITSELF
     love.graphics.setLineWidth(arm.lineThickness)
     love.graphics.setColor(arm.activeColor)
-    love.graphics.line(arm.root[1], arm.root[2], arm.jointPos[1][1], arm.jointPos[1][2])
+    dx = arm.jointPos[1][1] - arm.root[1]
+    dy = arm.jointPos[1][2] - arm.root[2]
+    currentAngle = math.pi / 2 - math.atan2(dx, dy)
+    startOffsetX = (arm.radii[1] - arm.jointLineThickness) * math.cos(currentAngle)
+    startOffsetY = (arm.radii[1] - arm.jointLineThickness) * math.sin(currentAngle)
+    endOffsetX = (arm.radii[2] - arm.jointLineThickness / 2) * math.cos(currentAngle)
+    endOffsetY = (arm.radii[2] - arm.jointLineThickness / 2) * math.sin(currentAngle)
+    love.graphics.line(
+        arm.root[1] + startOffsetX, arm.root[2] + startOffsetY,
+        arm.jointPos[1][1] - endOffsetX, arm.jointPos[1][2] - endOffsetY
+    )
     if selectedSegment ~= 1 then
         love.graphics.setLineWidth(arm.lineThickness / 3)
         love.graphics.setColor(scene.backgroundColor)
-        love.graphics.line(arm.root[1], arm.root[2], arm.jointPos[1][1], arm.jointPos[1][2])
+        love.graphics.line(
+            arm.root[1], arm.root[2],
+            arm.jointPos[1][1], arm.jointPos[1][2]
+        )
         love.graphics.setLineWidth(arm.lineThickness)
     end
     for segment = 2, #arm.jointPos do
+        dx = arm.jointPos[segment][1] - arm.jointPos[segment - 1][1]
+        dy = arm.jointPos[segment][2] - arm.jointPos[segment - 1][2]
+        currentAngle = math.pi / 2 - math.atan2(dx, dy)
+        startOffsetX = (arm.radii[segment - 1] - arm.jointLineThickness) * math.cos(currentAngle)
+        startOffsetY = (arm.radii[segment - 1] - arm.jointLineThickness) * math.sin(currentAngle)
+        endOffsetX = (arm.radii[segment] - arm.jointLineThickness) * math.cos(currentAngle)
+        endOffsetY = (arm.radii[segment] - arm.jointLineThickness) * math.sin(currentAngle)
         love.graphics.setLineWidth(arm.linkThicknesses[segment])
         love.graphics.setColor(arm.activeColor)
         love.graphics.line(
-            arm.jointPos[segment - 1][1], arm.jointPos[segment - 1][2],
-            arm.jointPos[segment][1], arm.jointPos[segment][2]
+            arm.jointPos[segment - 1][1] + startOffsetX, arm.jointPos[segment - 1][2] + startOffsetY,
+            arm.jointPos[segment][1] - endOffsetX, arm.jointPos[segment][2] - endOffsetY
         )
         if selectedSegment ~= segment then
             love.graphics.setLineWidth(arm.linkThicknesses[segment] / 3)
             love.graphics.setColor(scene.backgroundColor)
             love.graphics.line(
-                arm.jointPos[segment - 1][1], arm.jointPos[segment - 1][2],
-                arm.jointPos[segment][1], arm.jointPos[segment][2]
+                arm.jointPos[segment - 1][1] + startOffsetX, arm.jointPos[segment - 1][2] + startOffsetY,
+                arm.jointPos[segment][1] - endOffsetX, arm.jointPos[segment][2] - endOffsetY
             )
             love.graphics.setLineWidth(arm.lineThickness)
         end
         love.graphics.setLineWidth(arm.jointLineThickness)
-        drawJoint(arm.jointPos[segment - 1][1], arm.jointPos[segment - 1][2], arm.radii[segment], arm.activeColor, 'filled', scene.backgroundColor)
+        drawJoint(arm.jointPos[segment - 1][1], arm.jointPos[segment - 1][2], arm.radii[segment], arm.activeColor, 'hollow')
     end
     love.graphics.setLineWidth(arm.jointLineThickness)
-    drawJoint(endEffector[1], endEffector[2], arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, arm.activeColor, 'filled', scene.backgroundColor)
+    drawJoint(endEffector[1], endEffector[2], arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, arm.activeColor, 'hollow')
     -- TARGET
     if not reachable then
         drawJoint(mousePos[1], mousePos[2], arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, arm.inactiveColor, 'hollow')
     end
     drawJoint(target[1], target[2], arm.radii[#arm.radii] / arm.jointRadiusDecreaseRate, arm.activeColor, 'hollow')
-    -- BACKGROUND
+    -- FOREGROUND
     love.graphics.setLineWidth(arm.jointLineThickness)
-    drawJoint(arm.root[1], arm.root[2], arm.radii[1], arm.activeColor, 'filled', arm.activeColor)
+    drawJoint(arm.root[1], arm.root[2], arm.radii[1], arm.activeColor, 'filled')
     love.graphics.setColor(scene.foregroundColor)
     love.graphics.rectangle("fill", 0, scene.separatorY, window.width, window.height - scene.separatorY)
     love.graphics.setColor(scene.separatorColor)
     love.graphics.setLineWidth(scene.separatorThickness)
-    love.graphics.line(0, scene.separatorY, window.width, scene.separatorY)
+    love.graphics.line(
+        0, scene.separatorY,
+        window.width, scene.separatorY
+    )
     love.graphics.setColor(color.foregroundShadow)
     love.graphics.rectangle('fill', 0, scene.separatorY + scene.separatorThickness / 2, window.width, scene.separatorShadowYoffset)
 end
